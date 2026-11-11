@@ -25,6 +25,15 @@
             android:textStyle="bold" />
 
         <ImageButton
+            android:id="@+id/btn_image"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/open_image_gen"
+            android:src="@android:drawable/ic_menu_gallery"
+            app:tint="@color/on_primary" />
+
+        <ImageButton
             android:id="@+id/btn_clear"
             android:layout_width="48dp"
             android:layout_height="48dp"
