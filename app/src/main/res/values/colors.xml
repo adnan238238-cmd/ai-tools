@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#4F46E5</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="bubble_user">#4F46E5</color>
+    <color name="bubble_ai">#F1F1F4</color>
+    <color name="text_on_user">#FFFFFF</color>
+    <color name="text_on_ai">#1B1B1F</color>
+</resources>

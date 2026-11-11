@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI Tools</string>
+    <string name="settings">Settings</string>
+    <string name="api_key">Mistral API Key</string>
+    <string name="api_key_hint">sk-…</string>
+    <string name="save">Save</string>
+    <string name="message_hint">Message likhun…</string>
+    <string name="send">Send</string>
+    <string name="no_api_key">Prothome Settings-e Mistral API key din</string>
+    <string name="open_settings">Settings khulun</string>
+    <string name="thinking">Bhabchhe…</string>
+    <string name="error_prefix">Error: %1$s</string>
+    <string name="api_key_saved">API key save hoyeche ✓</string>
+    <string name="clear_chat">Chat clear</string>
+    <string name="welcome">AI Tools-e shagotom! Mistral API key diye AI-er sathe chat korte parben.\n\nProthome Settings-e key add korun.</string>
+    <string name="you">You</string>
+    <string name="ai">AI</string>
+</resources>
