@@ -34,6 +34,9 @@ class MainActivity : AppCompatActivity() {
         }
         binding.recyclerChat.adapter = adapter
 
+        binding.btnImage.setOnClickListener {
+            startActivity(android.content.Intent(this, ImageGenerationActivity::class.java))
+        }
         binding.btnSettings.setOnClickListener { openSettings() }
         binding.btnClear.setOnClickListener { confirmClearChat() }
         binding.btnSend.setOnClickListener { sendMessage() }

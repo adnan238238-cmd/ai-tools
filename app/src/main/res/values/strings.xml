@@ -16,6 +16,14 @@
     <string name="welcome">AI Tools-e shagotom! Mistral API key diye AI-er sathe chat korte parben.\n\nProthome Settings-e key add korun.</string>
     <string name="you">You</string>
     <string name="ai">AI</string>
+    <string name="image_gen_title">AI Image</string>
+    <string name="image_prompt_hint">Ki chobi banabo, likhun… (Bangla/English)</string>
+    <string name="generate_image">Generate</string>
+    <string name="save_image">Save kore nie jao</string>
+    <string name="image_saved">Gallery-te save hoyeche ✓</string>
+    <string name="save_failed">Save kora jayni, abar try korun</string>
+    <string name="prompt_required">Age likhun ki chobi banate chan</string>
+    <string name="open_image_gen">AI image generation</string>
     <string name="admob_app_id">ca-app-pub-1321070603657931~8224626790</string>
     <string name="admob_banner_unit_id">ca-app-pub-1321070603657931/6719973439</string>
 </resources>
