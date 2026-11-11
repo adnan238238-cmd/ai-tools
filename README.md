@@ -20,3 +20,12 @@ The APK is built automatically by GitHub Actions on every push:
 4. Install the APK on your phone (enable "Install unknown apps" if asked)
 
 To build locally: open the project in Android Studio and run **Build > Build APK(s)**.
+
+## Ads (AdMob)
+The app shows a banner ad using Google's **test ad IDs**, so no real revenue yet.
+To earn from ads:
+1. Create an account at [apps.admob.com](https://apps.admob.com) and register the app
+2. In `app/src/main/res/values/strings.xml`, replace:
+   - `admob_app_id` with your AdMob App ID
+   - `admob_banner_unit_id` with your Banner Ad Unit ID
+3. Wait for AdMob's app review — real ads then start serving

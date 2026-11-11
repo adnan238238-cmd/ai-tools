@@ -16,4 +16,6 @@
     <string name="welcome">AI Tools-e shagotom! Mistral API key diye AI-er sathe chat korte parben.\n\nProthome Settings-e key add korun.</string>
     <string name="you">You</string>
     <string name="ai">AI</string>
+    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_banner_unit_id">ca-app-pub-3940256099942544/6300978111</string>
 </resources>
