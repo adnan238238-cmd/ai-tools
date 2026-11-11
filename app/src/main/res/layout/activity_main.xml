@@ -73,6 +73,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <com.google.android.gms.ads.AdView
+        android:id="@+id/ad_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        ads:adSize="BANNER"
+        ads:adUnitId="@string/admob_banner_unit_id"
+        app:layout_constraintBottom_toBottomOf="parent"
+        xmlns:ads="http://schemas.android.com/apk/res-auto" />
+
     <LinearLayout
         android:id="@+id/input_bar"
         android:layout_width="match_parent"
@@ -82,7 +91,7 @@
         android:gravity="bottom"
         android:orientation="horizontal"
         android:padding="8dp"
-        app:layout_constraintBottom_toBottomOf="parent">
+        app:layout_constraintBottom_toTopOf="@id/ad_view">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/input_message"
