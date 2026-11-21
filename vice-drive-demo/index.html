@@ -183,10 +183,10 @@
 
   // ---------- state ----------
   let playing = false, raf = null;
-  let player, enemies = [], police = [], coins = [],
+  let player, enemies = [], police = [], coins = [], props = [],
       score = 0, speed = 5, frame = 0, roadOffset = 0,
       sirenTimer = 0, level = 1, lastChime = 0,
-      trafficTimer = 90, coinTimer = 140, policeTimer = 900,
+      trafficTimer = 90, coinTimer = 140, policeTimer = 900, propTimer = 40,
       nitroLeft = 0, nitroCd = 0, lastTapT = 0;
   const keys = {};
   let touchX = null;
@@ -216,11 +216,11 @@
   function newGame() {
     initAudio();
     player = { x: W/2 - 25, y: H - 110, w: 50, h: 90 };
-    enemies = []; police = []; coins = [];
+    enemies = []; police = []; coins = []; props = [];
     score = 0; speed = 5; frame = 0; roadOffset = 0;
     sirenTimer = 0; level = 1; lastChime = 0;
     nitroLeft = 0; nitroCd = 0;
-    trafficTimer = 90; coinTimer = 140; policeTimer = 900;
+    trafficTimer = 90; coinTimer = 140; policeTimer = 900; propTimer = 40;
     playing = true;
     menu.classList.add('hidden'); over.classList.add('hidden');
     if (raf) cancelAnimationFrame(raf);
@@ -365,6 +365,82 @@
 
   const ENEMY_COLORS = ['#e94f64', '#4fa3e9', '#4fe97f', '#e9c94f', '#a24fe9'];
 
+  // roadside ad texts (original, Vice-City style)
+  const BILLBOARD_TEXTS = ['VICE CLUB', 'MALIBU 24/7', 'NEON PIZZA', 'OCEAN HOTEL',
+                           'PALM Casino', 'SUNSET FM 98.6', 'BEACH BODY GYM', 'FLAMINGO BAR'];
+
+  function drawProps(night) {
+    props.forEach(p => {
+      if (p.k === 'palm') {
+        // trunk
+        ctx.strokeStyle = '#5a4632'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p.x + 10, p.y + 80);
+        ctx.quadraticCurveTo(p.x + 4, p.y + 40, p.x + 12, p.y + 12);
+        ctx.stroke();
+        // fronds
+        ctx.strokeStyle = `hsl(${130 + p.hue % 40}, 60%, ${night > 0.4 ? 22 : 42}%)`;
+        ctx.lineWidth = 4;
+        for (const angle of [-2.6, -2.1, -1.4, -0.9, -0.4, 0.2]) {
+          ctx.beginPath();
+          ctx.moveTo(p.x + 12, p.y + 12);
+          ctx.quadraticCurveTo(p.x + 12 + Math.cos(angle) * 18, p.y + 12 + Math.sin(angle) * 12,
+                               p.x + 12 + Math.cos(angle) * 30, p.y + 12 + Math.sin(angle) * 18 + 8);
+          ctx.stroke();
+        }
+      } else if (p.k === 'building') {
+        const bw = 46, bh = 120;
+        const g = ctx.createLinearGradient(0, p.y, 0, p.y + bh);
+        g.addColorStop(0, night > 0.4 ? '#12092b' : '#39304a');
+        g.addColorStop(1, night > 0.4 ? '#1c0f3f' : '#4a3f66');
+        ctx.fillStyle = g;
+        roundRect(p.x, p.y, bw, bh, 4); ctx.fill();
+        // lit windows
+        for (let wy = p.y + 10; wy < p.y + bh - 8; wy += 16) {
+          for (let wx = p.x + 8; wx < p.x + bw - 8; wx += 14) {
+            const lit = ((wx * 7 + wy * 13 + p.hue) % 5) < 2 + night;
+            ctx.fillStyle = lit ? `rgba(255,228,120,${0.35 + night * 0.5})` : 'rgba(0,0,0,.35)';
+            ctx.fillRect(wx, wy, 8, 9);
+          }
+        }
+        // neon roof sign
+        ctx.fillStyle = `hsl(${p.hue}, 90%, 60%)`;
+        ctx.fillRect(p.x + 6, p.y - 8, bw - 12, 4);
+        if (night > 0.4) {
+          ctx.fillStyle = `hsla(${p.hue}, 90%, 60%, .3)`;
+          ctx.fillRect(p.x - 6, p.y - 18, bw + 12, 24);
+        }
+      } else {                               // billboard (the "ads")
+        const bw = 58, bh = 34, postTop = p.y + bh;
+        // posts
+        ctx.fillStyle = '#3a3f47';
+        ctx.fillRect(p.x + 10, postTop, 5, 30);
+        ctx.fillRect(p.x + bw - 15, postTop, 5, 30);
+        // panel with glow
+        const glow = night > 0.25;
+        ctx.fillStyle = '#0d0d16';
+        roundRect(p.x, p.y, bw, bh, 5); ctx.fill();
+        ctx.strokeStyle = `hsl(${p.hue}, 90%, 62%)`; ctx.lineWidth = 2;
+        roundRect(p.x, p.y, bw, bh, 5); ctx.stroke();
+        if (glow) {
+          ctx.fillStyle = `hsla(${p.hue}, 90%, 62%, .28)`;
+          roundRect(p.x - 5, p.y - 5, bw + 10, bh + 10, 8); ctx.fill();
+        }
+        // ad text — fits 2 lines
+        ctx.fillStyle = `hsl(${p.hue}, 95%, 72%)`;
+        ctx.font = 'bold 10px Segoe UI, Arial';
+        ctx.textAlign = 'center';
+        const words = p.text.split(' ');
+        if (words.length > 1) {
+          ctx.fillText(words[0], p.x + bw / 2, p.y + 14);
+          ctx.fillText(words.slice(1).join(' '), p.x + bw / 2, p.y + 26);
+        } else {
+          ctx.fillText(p.text, p.x + bw / 2, p.y + 20);
+        }
+      }
+    });
+  }
+
   // ---------- update ----------
   function update() {
     frame++;
@@ -389,6 +465,21 @@
     if (keys['arrowright'] || keys['d']) player.x += 7;
     if (touchX !== null) player.x = touchX - player.w / 2;
     player.x = Math.max(70, Math.min(W - 70 - player.w, player.x));
+
+    // roadside scenery: billboards, palms, buildings (both sides)
+    if (--propTimer <= 0) {
+      propTimer = 55 + Math.floor(Math.random() * 50);
+      const side = Math.random() < 0.5 ? 0 : 1;                 // 0 left, 1 right
+      const x = side === 0 ? 6 + Math.random() * 22 : W - 60 + Math.random() * 22;
+      const kinds = [
+        { k: 'palm' },
+        { k: 'palm' },
+        { k: 'building' },
+        { k: 'billboard', text: BILLBOARD_TEXTS[Math.floor(Math.random() * BILLBOARD_TEXTS.length)] }
+      ];
+      props.push({ ...kinds[Math.floor(Math.random() * kinds.length)],
+                   x, y: -90, hue: Math.floor(Math.random() * 360) });
+    }
 
     // traffic (countdown timer — reliable even as difficulty changes)
     if (--trafficTimer <= 0) {
@@ -417,7 +508,13 @@
     sirenTimer--;
     if (police.length && sirenTimer <= 0) { sfxSiren(); sirenTimer = 90; }
 
-    // move traffic + collision
+    // roadside props scroll with the road
+    for (let i = props.length - 1; i >= 0; i--) {
+      props[i].y += speed * boost;
+      if (props[i].y > H + 100) props.splice(i, 1);
+    }
+
+    // traffic + collision
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       e.y += speed * boost;
@@ -492,6 +589,7 @@
     drawRoad(night);
 
     const dark = night > 0;
+    drawProps(night);
     if (dark) headlightCone(player.x, player.y, player.w);
 
     coins.forEach(drawCoin);
