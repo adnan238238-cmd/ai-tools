@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vice Drive VI — Browser Demo (v3)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0b0016;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; overflow: hidden;
+  }
+  #game { border-radius: 12px; box-shadow: 0 0 60px rgba(255,0,200,.25); cursor: pointer; }
+
+  /* ---------- MENU OVERLAY ---------- */
+  #menu {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #1a0033 0%, #4b0f6b 35%, #c22e83 60%, #ff7b4f 80%, #2b0a3d 100%);
+    z-index: 10; text-align: center;
+  }
+  #menu.hidden, #gameover.hidden { display: none; }
+  .sun { width: 180px; height: 180px; border-radius: 50%;
+         background: linear-gradient(180deg, #ffd24f, #ff5e7e);
+         box-shadow: 0 0 80px #ff5e7e, 0 0 160px rgba(255,0,200,.4);
+         margin-bottom: 18px;
+         background-image: repeating-linear-gradient(0deg, transparent 0 14px, rgba(0,0,0,.35) 14px 20px);
+  }
+  h1.gta {
+    font-size: 60px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(90deg, #7df9ff, #ff6ec7, #ffe14f);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 30px rgba(125,249,255,.35);
+    margin-bottom: 6px;
+  }
+  .sub { color: #ffd9f2; letter-spacing: 8px; font-size: 14px; margin-bottom: 18px; text-transform: uppercase; }
+  #highScoreMenu {
+    color: #ffe14f; font-weight: 700; font-size: 17px; margin-bottom: 26px;
+    text-shadow: 0 0 12px rgba(255,225,79,.6);
+  }
+  #playBtn {
+    font-size: 26px; font-weight: 800; letter-spacing: 3px;
+    padding: 16px 60px; border: none; border-radius: 40px; cursor: pointer;
+    background: linear-gradient(90deg, #ff6ec7, #7df9ff);
+    color: #14001f; text-transform: uppercase;
+    box-shadow: 0 0 30px rgba(255,110,199,.6), 0 0 60px rgba(125,249,255,.3);
+    transition: transform .15s, box-shadow .15s;
+  }
+  #playBtn:hover { transform: scale(1.06); box-shadow: 0 0 45px rgba(255,110,199,.9), 0 0 90px rgba(125,249,255,.5); }
+  .controls { margin-top: 26px; color: #ffd9f2; font-size: 13px; opacity: .85; line-height: 1.9; }
+  kbd { background: rgba(0,0,0,.35); padding: 3px 8px; border-radius: 6px; font-family: inherit; }
+
+  /* ---------- GAME OVER ---------- */
+  #gameover {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(20, 0, 30, .82); text-align: center;
+  }
+  #gameover h2 {
+    font-size: 56px; font-weight: 900; letter-spacing: 2px; color: #e6e6e6;
+    font-family: 'Times New Roman', serif; text-shadow: 3px 3px 0 #7a0010;
+    margin-bottom: 12px;
+  }
+  #gameover h2.busted { text-shadow: 3px 3px 0 #00327a; }
+  #finalScore { color: #7df9ff; font-size: 22px; margin-bottom: 8px; }
+  #newHigh { color: #ffe14f; font-size: 16px; font-weight: 700; margin-bottom: 30px; min-height: 20px; }
+  #retryBtn {
+    font-size: 20px; font-weight: 700; letter-spacing: 2px;
+    padding: 12px 44px; border: 2px solid #ff6ec7; border-radius: 40px;
+    background: transparent; color: #ffd9f2; cursor: pointer; text-transform: uppercase;
+  }
+  #retryBtn:hover { background: rgba(255,110,199,.2); }
+</style>
+</head>
+<body>
+<div style="position:relative">
+  <canvas id="game" width="480" height="720"></canvas>
+
+  <div id="menu">
+    <div class="sun"></div>
+    <h1 class="gta">VICE&nbsp;DRIVE&nbsp;VI</h1>
+    <div class="sub">Fan-made browser demo &middot; v3</div>
+    <div id="highScoreMenu"></div>
+    <button id="playBtn">▶ Play Now</button>
+    <div class="controls">
+      Move: <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd> · Touch/drag on phone<br>
+      Nitro: <kbd>Space</kbd> (double-tap on phone) · 🚔 Police = BUSTED · 💰 Coin = +10<br>
+      🌙 Night falls as you drive · 🗺️ Minimap top-right · 🔊 Sound on
+    </div>
+  </div>
+
+  <div id="gameover" class="hidden">
+    <h2 id="overTitle">WASTED</h2>
+    <div id="finalScore"></div>
+    <div id="newHigh"></div>
+    <button id="retryBtn">Retry</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const menu = document.getElementById('menu');
+  const over = document.getElementById('gameover');
+  const finalScore = document.getElementById('finalScore');
+  const newHighEl = document.getElementById('newHigh');
+  const overTitle = document.getElementById('overTitle');
+  const highScoreMenu = document.getElementById('highScoreMenu');
+
+  // ---------- high score ----------
+  const HS_KEY = 'viceDriveHighScore';
+  let highScore = parseInt(localStorage.getItem(HS_KEY) || '0', 10);
+  function showMenuHigh() {
+    highScoreMenu.textContent = highScore > 0 ? '🏆 High Score: ' + highScore : 'No high score yet — set one!';
+  }
+  showMenuHigh();
+
+  // ---------- sound ----------
+  let AC = null, engineOsc = null, engineGain = null;
+  function initAudio() {
+    if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    engineOsc = AC.createOscillator();
+    engineGain = AC.createGain();
+    engineOsc.type = 'sawtooth';
+    engineOsc.frequency.value = 60;
+    engineGain.gain.value = 0;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400;
+    engineOsc.connect(lp); lp.connect(engineGain); engineGain.connect(AC.destination);
+    engineOsc.start();
+  }
+  function engine(spd) {
+    if (!engineGain) return;
+    engineGain.gain.value = nitroActive() ? 0.06 : 0.035;
+    engineOsc.frequency.value = 50 + spd * 9 + (nitroActive() ? 70 : 0);
+  }
+  function engineOff() { if (engineGain) engineGain.gain.value = 0; }
+  function sfxCrash() {
+    if (!AC) return;
+    const dur = 0.5, buf = AC.createBuffer(1, AC.sampleRate * dur, AC.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++)
+      d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2;
+    const src = AC.createBufferSource(); src.buffer = buf;
+    const g = AC.createGain(); g.gain.value = 0.5;
+    src.connect(g); g.connect(AC.destination); src.start();
+  }
+  function sfxBeep(freq, dur = 0.12, type = 'square', vol = 0.15) {
+    if (!AC) return;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + dur);
+  }
+  function sfxCoin() { sfxBeep(1200, 0.09, 'sine', 0.18); sfxBeep(1600, 0.14, 'sine', 0.12); }
+  function sfxSiren() {
+    if (!AC) return;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'triangle'; g.gain.value = 0.08;
+    o.frequency.setValueAtTime(700, AC.currentTime);
+    o.frequency.linearRampToValueAtTime(1100, AC.currentTime + 0.18);
+    o.frequency.linearRampToValueAtTime(700, AC.currentTime + 0.36);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + 0.36);
+  }
+  function sfxNitro() {
+    if (!AC) return;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(120, AC.currentTime);
+    o.frequency.exponentialRampToValueAtTime(900, AC.currentTime + 0.3);
+    g.gain.setValueAtTime(0.15, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.4);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + 0.4);
+  }
+
+  // ---------- state ----------
+  let playing = false, raf = null;
+  let player, enemies = [], police = [], coins = [], props = [],
+      score = 0, speed = 5, frame = 0, roadOffset = 0,
+      sirenTimer = 0, level = 1, lastChime = 0,
+      trafficTimer = 90, coinTimer = 140, policeTimer = 900, propTimer = 40,
+      nitroLeft = 0, nitroCd = 0, lastTapT = 0;
+  const keys = {};
+  let touchX = null;
+
+  const NITRO_MAX = 120, NITRO_CD = 360;   // frames (~2s boost, ~6s cooldown)
+  function nitroActive()  { return nitroLeft > 0; }
+  function nitroReady()   { return nitroCd <= 0 && nitroLeft <= 0; }
+
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+    if (k === ' ' && playing && nitroReady()) { nitroLeft = NITRO_MAX; sfxNitro(); }
+    if (k === ' ') e.preventDefault();
+  });
+  addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+  cv.addEventListener('touchstart', e => {          // double-tap = nitro
+    const now = Date.now();
+    if (now - lastTapT < 300 && playing && nitroReady()) { nitroLeft = NITRO_MAX; sfxNitro(); }
+    lastTapT = now;
+    touchX = e.touches[0].clientX - cv.getBoundingClientRect().left;
+  }, {passive: true});
+  cv.addEventListener('touchmove', e => {
+    touchX = e.touches[0].clientX - cv.getBoundingClientRect().left;
+  }, {passive: true});
+  cv.addEventListener('touchend', () => touchX = null);
+
+  function newGame() {
+    initAudio();
+    player = { x: W/2 - 25, y: H - 110, w: 50, h: 90 };
+    enemies = []; police = []; coins = []; props = [];
+    score = 0; speed = 5; frame = 0; roadOffset = 0;
+    sirenTimer = 0; level = 1; lastChime = 0;
+    nitroLeft = 0; nitroCd = 0;
+    trafficTimer = 90; coinTimer = 140; policeTimer = 900; propTimer = 40;
+    playing = true;
+    menu.classList.add('hidden'); over.classList.add('hidden');
+    if (raf) cancelAnimationFrame(raf);
+    loop();
+  }
+
+  function endGame(reason) {
+    playing = false;
+    engineOff();
+    sfxCrash();
+    const isPolice = reason === 'police';
+    overTitle.textContent = isPolice ? 'BUSTED' : 'WASTED';
+    overTitle.classList.toggle('busted', isPolice);
+    finalScore.textContent = 'Score: ' + Math.floor(score) + '  ·  Level ' + level;
+    if (Math.floor(score) > highScore) {
+      highScore = Math.floor(score);
+      localStorage.setItem(HS_KEY, String(highScore));
+      newHighEl.textContent = '🏆 NEW HIGH SCORE!';
+    } else {
+      newHighEl.textContent = 'Best: ' + highScore;
+    }
+    over.classList.remove('hidden');
+    showMenuHigh();
+  }
+
+  // ---------- road ----------
+  function drawRoad(night) {
+    ctx.fillStyle = '#1c1220'; ctx.fillRect(0, 0, W, H);
+    const startX = 60, roadW = W - 120;
+    ctx.fillStyle = night > 0.5 ? '#181322' : '#25202b';
+    ctx.fillRect(startX, 0, roadW, H);
+    ctx.fillStyle = '#f5f0e6';
+    ctx.fillRect(startX + 8, 0, 4, H); ctx.fillRect(startX + roadW - 12, 0, 4, H);
+    ctx.fillStyle = '#ffe14f';
+    for (let y = -80 + roadOffset; y < H; y += 80)
+      ctx.fillRect(W/2 - 3, y, 6, 45);
+    if (night > 0) {
+      for (let y = ((roadOffset * 2) % 240) - 120; y < H; y += 240) {
+        const gl = ctx.createRadialGradient(startX - 14, y, 2, startX - 14, y, 34);
+        gl.addColorStop(0, `rgba(255,225,120,${0.5 * night})`);
+        gl.addColorStop(1, 'rgba(255,225,120,0)');
+        ctx.fillStyle = gl;
+        ctx.fillRect(startX - 48, y - 34, 68, 68);
+        ctx.fillRect(startX + roadW - 20, y - 34, 68, 68);
+      }
+    }
+  }
+
+  // ---------- drawing helpers ----------
+  function drawCar(x, y, w, h, body, glass) {
+    ctx.fillStyle = body;
+    roundRect(x, y, w, h, 10); ctx.fill();
+    ctx.fillStyle = glass;
+    roundRect(x + 6, y + 12, w - 12, 18, 5); ctx.fill();
+    roundRect(x + 6, y + h - 30, w - 12, 16, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    roundRect(x + 4, y + 34, 10, 20, 4); ctx.fill();
+    roundRect(x + w - 14, y + 34, 10, 20, 4); ctx.fill();
+  }
+
+  function drawPolice(x, y, w, h) {
+    drawCar(x, y, w, h, '#eef2f7', '#9dd');
+    ctx.fillStyle = '#111';
+    roundRect(x, y, w, 22, 4); ctx.fill();
+    const phase = Math.floor(frame / 8) % 2;
+    ctx.fillStyle = phase ? '#ff2b3d' : 'rgba(255,43,61,.35)';
+    ctx.fillRect(x + 6, y + 26, 16, 8);
+    ctx.fillStyle = phase ? 'rgba(43,110,255,.35)' : '#2b6eff';
+    ctx.fillRect(x + 28, y + 26, 16, 8);
+    if (phase) {
+      ctx.fillStyle = 'rgba(43,110,255,.25)';
+      ctx.fillRect(x - 8, y + 10, w + 16, 40);
+    }
+  }
+
+  function drawCoin(c) {
+    const bob = Math.sin(frame / 12 + c.x) * 2;
+    const r = 11 + c.r;
+    const g = ctx.createRadialGradient(c.x, c.y + bob, 2, c.x, c.y + bob, r + 6);
+    g.addColorStop(0, 'rgba(255,228,80,.55)');
+    g.addColorStop(1, 'rgba(255,228,80,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(c.x - r - 6, c.y + bob - r - 6, (r + 6) * 2, (r + 6) * 2);
+    ctx.fillStyle = '#ffdb34';
+    ctx.beginPath(); ctx.arc(c.x, c.y + bob, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fdf3b8';
+    ctx.font = 'bold 14px Segoe UI, Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('$', c.x, c.y + bob + 1);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  function headlightCone(x, y, w) {
+    const g = ctx.createLinearGradient(0, y - 160, 0, y);
+    g.addColorStop(0, 'rgba(255,250,200,0)');
+    g.addColorStop(1, 'rgba(255,250,200,.22)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x + 4, y + 6);
+    ctx.lineTo(x - 12, y - 170);
+    ctx.lineTo(x + w + 12, y - 170);
+    ctx.lineTo(x + w - 4, y + 6);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---------- nitro fx ----------
+  function speedLines() {
+    ctx.strokeStyle = 'rgba(190,240,255,.5)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 14; i++) {
+      const x = 70 + ((frame * 37 + i * 97) % (W - 140));
+      const y = ((frame * 26 + i * 131) % H);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 46); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(125,249,255,.12)';
+    ctx.fillRect(0, 0, W, H);
+  }
+  function nitroFlames() {
+    if (!nitroActive()) return;
+    for (const dx of [10, player.w - 10]) {
+      const fl = 18 + Math.random() * 22;
+      const g = ctx.createLinearGradient(0, player.y + player.h, 0, player.y + player.h + fl);
+      g.addColorStop(0, '#7df9ff'); g.addColorStop(1, 'rgba(125,249,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(player.x + dx - 6, player.y + player.h);
+      ctx.lineTo(player.x + dx, player.y + player.h + fl);
+      ctx.lineTo(player.x + dx + 6, player.y + player.h);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  const ENEMY_COLORS = ['#e94f64', '#4fa3e9', '#4fe97f', '#e9c94f', '#a24fe9'];
+
+  // roadside ad texts (original, Vice-City style)
+  const BILLBOARD_TEXTS = ['VICE CLUB', 'MALIBU 24/7', 'NEON PIZZA', 'OCEAN HOTEL',
+                           'PALM Casino', 'SUNSET FM 98.6', 'BEACH BODY GYM', 'FLAMINGO BAR'];
+
+  function drawProps(night) {
+    props.forEach(p => {
+      if (p.k === 'palm') {
+        // trunk
+        ctx.strokeStyle = '#5a4632'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p.x + 10, p.y + 80);
+        ctx.quadraticCurveTo(p.x + 4, p.y + 40, p.x + 12, p.y + 12);
+        ctx.stroke();
+        // fronds
+        ctx.strokeStyle = `hsl(${130 + p.hue % 40}, 60%, ${night > 0.4 ? 22 : 42}%)`;
+        ctx.lineWidth = 4;
+        for (const angle of [-2.6, -2.1, -1.4, -0.9, -0.4, 0.2]) {
+          ctx.beginPath();
+          ctx.moveTo(p.x + 12, p.y + 12);
+          ctx.quadraticCurveTo(p.x + 12 + Math.cos(angle) * 18, p.y + 12 + Math.sin(angle) * 12,
+                               p.x + 12 + Math.cos(angle) * 30, p.y + 12 + Math.sin(angle) * 18 + 8);
+          ctx.stroke();
+        }
+      } else if (p.k === 'building') {
+        const bw = 46, bh = 120;
+        const g = ctx.createLinearGradient(0, p.y, 0, p.y + bh);
+        g.addColorStop(0, night > 0.4 ? '#12092b' : '#39304a');
+        g.addColorStop(1, night > 0.4 ? '#1c0f3f' : '#4a3f66');
+        ctx.fillStyle = g;
+        roundRect(p.x, p.y, bw, bh, 4); ctx.fill();
+        // lit windows
+        for (let wy = p.y + 10; wy < p.y + bh - 8; wy += 16) {
+          for (let wx = p.x + 8; wx < p.x + bw - 8; wx += 14) {
+            const lit = ((wx * 7 + wy * 13 + p.hue) % 5) < 2 + night;
+            ctx.fillStyle = lit ? `rgba(255,228,120,${0.35 + night * 0.5})` : 'rgba(0,0,0,.35)';
+            ctx.fillRect(wx, wy, 8, 9);
+          }
+        }
+        // neon roof sign
+        ctx.fillStyle = `hsl(${p.hue}, 90%, 60%)`;
+        ctx.fillRect(p.x + 6, p.y - 8, bw - 12, 4);
+        if (night > 0.4) {
+          ctx.fillStyle = `hsla(${p.hue}, 90%, 60%, .3)`;
+          ctx.fillRect(p.x - 6, p.y - 18, bw + 12, 24);
+        }
+      } else {                               // billboard (the "ads")
+        const bw = 58, bh = 34, postTop = p.y + bh;
+        // posts
+        ctx.fillStyle = '#3a3f47';
+        ctx.fillRect(p.x + 10, postTop, 5, 30);
+        ctx.fillRect(p.x + bw - 15, postTop, 5, 30);
+        // panel with glow
+        const glow = night > 0.25;
+        ctx.fillStyle = '#0d0d16';
+        roundRect(p.x, p.y, bw, bh, 5); ctx.fill();
+        ctx.strokeStyle = `hsl(${p.hue}, 90%, 62%)`; ctx.lineWidth = 2;
+        roundRect(p.x, p.y, bw, bh, 5); ctx.stroke();
+        if (glow) {
+          ctx.fillStyle = `hsla(${p.hue}, 90%, 62%, .28)`;
+          roundRect(p.x - 5, p.y - 5, bw + 10, bh + 10, 8); ctx.fill();
+        }
+        // ad text — fits 2 lines
+        ctx.fillStyle = `hsl(${p.hue}, 95%, 72%)`;
+        ctx.font = 'bold 10px Segoe UI, Arial';
+        ctx.textAlign = 'center';
+        const words = p.text.split(' ');
+        if (words.length > 1) {
+          ctx.fillText(words[0], p.x + bw / 2, p.y + 14);
+          ctx.fillText(words.slice(1).join(' '), p.x + bw / 2, p.y + 26);
+        } else {
+          ctx.fillText(p.text, p.x + bw / 2, p.y + 20);
+        }
+      }
+    });
+  }
+
+  // ---------- update ----------
+  function update() {
+    frame++;
+    const boost = nitroActive() ? 1.8 : 1;
+    if (nitroActive()) nitroLeft--; else if (nitroCd > 0) nitroCd--;
+    roadOffset = (roadOffset + speed * boost) % 80;
+
+    score += 0.1 * boost;
+    const newLevel = Math.min(5, 1 + Math.floor(score / 200));   // 5 levels
+    if (newLevel > level) {
+      level = newLevel;
+      sfxBeep(600, 0.12, 'square', 0.12);
+      sfxBeep(900, 0.2, 'square', 0.12);
+    }
+    speed = 5 + Math.floor(score / 40) + (level - 1);            // harder levels
+    engine(speed);
+
+    const night = Math.min(1, score / 300);
+
+    // player movement
+    if (keys['arrowleft']  || keys['a']) player.x -= 7;
+    if (keys['arrowright'] || keys['d']) player.x += 7;
+    if (touchX !== null) player.x = touchX - player.w / 2;
+    player.x = Math.max(70, Math.min(W - 70 - player.w, player.x));
+
+    // roadside scenery: billboards, palms, buildings (both sides)
+    if (--propTimer <= 0) {
+      propTimer = 55 + Math.floor(Math.random() * 50);
+      const side = Math.random() < 0.5 ? 0 : 1;                 // 0 left, 1 right
+      const x = side === 0 ? 6 + Math.random() * 22 : W - 60 + Math.random() * 22;
+      const kinds = [
+        { k: 'palm' },
+        { k: 'palm' },
+        { k: 'building' },
+        { k: 'billboard', text: BILLBOARD_TEXTS[Math.floor(Math.random() * BILLBOARD_TEXTS.length)] }
+      ];
+      props.push({ ...kinds[Math.floor(Math.random() * kinds.length)],
+                   x, y: -90, hue: Math.floor(Math.random() * 360) });
+    }
+
+    // traffic (countdown timer — reliable even as difficulty changes)
+    if (--trafficTimer <= 0) {
+      trafficTimer = Math.max(55, Math.floor(150 - frame / 40 - (level - 1) * 20));
+      const laneW = (W - 140) / 3;
+      const lane = Math.floor(Math.random() * 3);
+      enemies.push({ x: 70 + lane * laneW + 8, y: -100, w: 50, h: 90,
+                     color: ENEMY_COLORS[Math.floor(Math.random() * ENEMY_COLORS.length)] });
+    }
+
+    // coins
+    if (--coinTimer <= 0) {
+      coinTimer = 140;
+      const laneW = (W - 140) / 3;
+      const lane = Math.floor(Math.random() * 3);
+      coins.push({ x: 70 + lane * laneW + laneW / 2 - 8, y: -30, r: Math.floor(Math.random() * 3) });
+    }
+
+    // police (more often on higher levels)
+    if (--policeTimer <= 0) {
+      policeTimer = Math.max(300, 900 - Math.floor(score / 2) - (level - 1) * 150);
+      police.push({ x: W/2 - 25, y: -120, w: 50, h: 90, vx: 0 });
+      sfxSiren();
+      sirenTimer = 90;
+    }
+    sirenTimer--;
+    if (police.length && sirenTimer <= 0) { sfxSiren(); sirenTimer = 90; }
+
+    // roadside props scroll with the road
+    for (let i = props.length - 1; i >= 0; i--) {
+      props[i].y += speed * boost;
+      if (props[i].y > H + 100) props.splice(i, 1);
+    }
+
+    // traffic + collision
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      e.y += speed * boost;
+      if (e.y > H) { enemies.splice(i, 1); continue; }
+      if (rectsOverlap(player, e)) { endGame('traffic'); return; }
+    }
+
+    // coins collect
+    for (let i = coins.length - 1; i >= 0; i--) {
+      const c = coins[i];
+      c.y += speed * boost;
+      if (c.y > H) { coins.splice(i, 1); continue; }
+      if (c.y + 12 > player.y + 30 && c.y < player.y + player.h - 10 &&
+          c.x > player.x - 8 && c.x < player.x + player.w + 8) {
+        coins.splice(i, 1);
+        score += 10;
+        sfxCoin();
+      }
+    }
+
+    // police homing + collision
+    for (let i = police.length - 1; i >= 0; i--) {
+      const p = police[i];
+      p.y += speed * 0.25 * boost;
+      p.vx += (player.x - p.x) * 0.004 * level;        // sharper pursuit each level
+      p.vx = Math.max(-2.4, Math.min(2.4, p.vx));
+      p.x += p.vx;
+      p.x = Math.max(70, Math.min(W - 70 - p.w, p.x));
+      if (p.y > H) { police.splice(i, 1); continue; }
+      if (rectsOverlap(player, p)) { endGame('police'); return; }
+    }
+
+    // milestone chime
+    if (Math.floor(score) % 50 === 0 && Math.floor(score) > lastChime) {
+      lastChime = Math.floor(score);
+      sfxBeep(880, 0.15, 'sine', 0.12);
+    }
+  }
+
+  function rectsOverlap(a, b) {
+    const pad = 8;
+    return a.x + pad < b.x + b.w && a.x + a.w - pad > b.x &&
+           a.y + pad < b.y + b.h && a.y + a.h - pad > b.y;
+  }
+
+  // ---------- minimap ----------
+  function drawMinimap() {
+    const mw = 46, mh = 150, mx = W - mw - 12, my = 60;
+    ctx.fillStyle = 'rgba(10,2,26,.6)';
+    roundRect(mx, my, mw, mh, 8); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,110,199,.5)'; ctx.lineWidth = 1.5;
+    roundRect(mx, my, mw, mh, 8); ctx.stroke();
+
+    const px = x => mx + 6 + (x - 70) * (mw - 12) / (W - 140);
+    const py = y => my + 6 + (y / H) * (mh - 12);
+
+    coins.forEach(c => { ctx.fillStyle = '#ffdb34';
+      ctx.fillRect(px(c.x), py(c.y), 3, 3); });
+    enemies.forEach(e => { ctx.fillStyle = '#ff5e5e';
+      ctx.fillRect(px(e.x), py(e.y), 4, 6); });
+    police.forEach(p => {
+      ctx.fillStyle = Math.floor(frame / 8) % 2 ? '#2b6eff' : '#ff2b3d';
+      ctx.fillRect(px(p.x), py(p.y), 4, 6); });
+    ctx.fillStyle = '#ffb347';
+    ctx.fillRect(px(player.x) - 1, py(player.y) - 2, 6, 8);
+  }
+
+  // ---------- render ----------
+  const LEVEL_NAMES = ['', 'EASY', 'CITY', 'BUSY', 'RUSH', 'INSANE'];
+  function render() {
+    const night = Math.min(1, score / 300);
+    drawRoad(night);
+
+    const dark = night > 0;
+    drawProps(night);
+    if (dark) headlightCone(player.x, player.y, player.w);
+
+    coins.forEach(drawCoin);
+    enemies.forEach(e => drawCar(e.x, e.y, e.w, e.h, e.color, dark ? '#fffeee' : '#bff'));
+    if (playing) {
+      police.forEach(p => drawPolice(p.x, p.y, p.w, p.h));
+      drawCar(player.x, player.y, player.w, player.h, '#ffb347', dark ? '#fffbe0' : '#ffe');
+      if (dark) {
+        ctx.fillStyle = 'rgba(255,60,60,.85)';
+        ctx.fillRect(player.x + 6, player.y + player.h - 6, 10, 5);
+        ctx.fillRect(player.x + player.w - 16, player.y + player.h - 6, 10, 5);
+      }
+      nitroFlames();
+      if (nitroActive()) speedLines();
+    }
+
+    if (night > 0) {
+      ctx.fillStyle = `rgba(8,4,32,${0.45 * night})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // HUD
+    ctx.fillStyle = '#fdf3ff';
+    ctx.font = 'bold 20px Segoe UI, Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('SCORE  ' + Math.floor(score), 16, 32);
+    ctx.font = '13px Segoe UI, Arial';
+    ctx.fillStyle = 'rgba(253,243,255,.65)';
+    ctx.fillText('speed ' + speed + (police.length ? '   🚔 POLICE!' : ''), 16, 52);
+    ctx.textAlign = 'right';
+    ctx.fillText('🏆 ' + highScore, W - 16, 32);
+    ctx.font = 'bold 12px Segoe UI, Arial';
+    ctx.fillStyle = '#ff6ec7';
+    ctx.fillText('LVL ' + level + ' · ' + LEVEL_NAMES[level], W - 16, 50);
+
+    // nitro bar
+    const nx = 16, ny = H - 22, nw = 110;
+    ctx.fillStyle = 'rgba(0,0,0,.4)';
+    roundRect(nx, ny, nw, 12, 6); ctx.fill();
+    if (nitroActive())      ctx.fillStyle = '#7df9ff';
+    else if (nitroReady())  ctx.fillStyle = '#25d97a';
+    else                    ctx.fillStyle = '#666';
+    const fill = nitroActive() ? (nitroLeft / NITRO_MAX)
+               : nitroReady()  ? 1
+               : 1 - nitroCd / NITRO_CD;
+    if (fill > 0) {
+      roundRect(nx + 2, ny + 2, (nw - 4) * Math.max(0, Math.min(1, fill)), 8, 4); ctx.fill();
+    }
+    ctx.font = '10px Segoe UI, Arial';
+    ctx.fillStyle = 'rgba(253,243,255,.8)';
+    ctx.textAlign = 'left';
+    ctx.fillText('NITRO 🚀' + (nitroReady() && !nitroActive() ? '  READY (Space)' : ''), nx, ny - 5);
+
+    if (playing) drawMinimap();
+  }
+
+  function loop() {
+    if (!playing) return;
+    update();
+    if (!playing) return;
+    render();
+    raf = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('playBtn').addEventListener('click', newGame);
+  document.getElementById('retryBtn').addEventListener('click', newGame);
+
+  score = 0; render();
+})();
+</script>
+</body>
+</html>
